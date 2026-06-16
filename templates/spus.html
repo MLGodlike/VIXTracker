@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SPUS Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #070b12;
+      --surface:  #0d1420;
+      --surface2: #121b2e;
+      --border:   #1c2d47;
+      --blue:     #00d4ff;
+      --blue-dim: rgba(0,212,255,0.12);
+      --purple:   #a78bfa;
+      --purple-dim: rgba(167,139,250,0.1);
+      --red:      #ff3b5c;
+      --green:    #00e5a0;
+      --text:     #d8e4f0;
+      --muted:    #4a6080;
+      --radius:   10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(167,139,250,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* NAV */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 60px;
+    }
+
+    .nav-logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--purple);
+    }
+
+    .nav-logo span { color: var(--muted); font-weight: 300; }
+
+    .nav-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--blue);
+      text-decoration: none;
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 4px;
+      padding: 5px 12px;
+      transition: all 0.15s;
+    }
+
+    .nav-link:hover { background: var(--blue-dim); }
+
+    .nav-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 12px;
+    }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .hero-eyebrow::before, .hero-eyebrow::after {
+      content: '';
+      width: 40px;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .price-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(4rem, 14vw, 9rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--purple);
+      text-shadow: 0 0 60px rgba(167,139,250,0.4), 0 0 120px rgba(167,139,250,0.15);
+    }
+
+    .price-number::after {
+      content: '|';
+      font-size: 0.5em;
+      vertical-align: super;
+      animation: blink 1s step-end infinite;
+      color: var(--purple);
+      margin-left: 4px;
+      opacity: 0.7;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .price-change {
+      margin-top: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .up   { color: var(--green); }
+    .down { color: var(--red); }
+
+    /* STAT STRIP */
+    .stat-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+
+    .stat-cell {
+      background: var(--surface);
+      padding: 20px 18px;
+      transition: background 0.12s;
+    }
+
+    .stat-cell:hover { background: var(--surface2); }
+
+    .stat-cell-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-cell-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    /* ANALYSIS HIGHLIGHT */
+    .analysis-highlight {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .highlight-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .highlight-card.accent {
+      border-color: rgba(167,139,250,0.3);
+      box-shadow: 0 0 30px rgba(167,139,250,0.05);
+    }
+
+    .highlight-card.accent::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--purple), transparent);
+    }
+
+    .highlight-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .highlight-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--purple);
+    }
+
+    .highlight-sub {
+      margin-top: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    /* PANEL */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .panel-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+    .panel-body { padding: 20px; }
+
+    canvas { width: 100% !important; }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 400;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr { border-bottom: 1px solid rgba(28,45,71,0.5); transition: background 0.12s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr.bearish { opacity: 0.45; }
+
+    tbody td { padding: 11px 16px; white-space: nowrap; }
+    tbody td:first-child { color: var(--muted); font-size: 0.7rem; }
+
+    .td-high  { color: var(--green); }
+    .td-low   { color: var(--red); }
+    .td-close-up   { color: var(--green); font-weight: 500; }
+    .td-close-down { color: var(--red); font-weight: 500; }
+    .td-analysis   { color: var(--purple); font-weight: 500; }
+    .td-na         { color: var(--muted); font-size: 0.7rem; }
+
+    .day-badge {
+      display: inline-block;
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+
+    .day-bull { background: rgba(0,229,160,0.1); color: var(--green); border: 1px solid rgba(0,229,160,0.2); }
+    .day-bear { background: rgba(255,59,92,0.08); color: var(--red);   border: 1px solid rgba(255,59,92,0.15); }
+
+    /* FOOTER */
+    footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    footer p {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .refresh-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--purple);
+      text-decoration: none;
+      border: 1px solid rgba(167,139,250,0.3);
+      border-radius: 4px;
+      padding: 6px 14px;
+      transition: all 0.15s;
+    }
+
+    .refresh-link:hover { background: var(--purple-dim); }
+
+    /* ERROR */
+    .error-panel {
+      background: rgba(255,59,92,0.07);
+      border: 1px solid rgba(255,59,92,0.25);
+      border-radius: var(--radius);
+      padding: 40px;
+      text-align: center;
+    }
+
+    .error-panel h2 {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--red);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .error-panel pre { font-size: 0.75rem; color: var(--muted); white-space: pre-wrap; }
+
+    @media (max-width: 640px) {
+      .stat-strip { grid-template-columns: 1fr 1fr; }
+      .analysis-highlight { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="nav-logo">SPUS<span>/</span>ANALYSIS</div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a href="/" class="nav-link">← VIX</a>
+      <div class="nav-tag">SP Funds S&P 500 Sharia ETF</div>
+    </div>
+  </nav>
+
+  {% if error %}
+  <div class="error-panel">
+    <h2>// Data unavailable</h2>
+    <pre>{{ error }}</pre>
+  </div>
+
+  {% else %}
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">Live · SPUS ETF</div>
+    <div class="price-number">${{ current }}</div>
+    <div class="price-change {% if change >= 0 %}up{% else %}down{% endif %}">
+      {% if change >= 0 %}
+        ▲ +{{ change }} (+{{ pct }}%)
+      {% else %}
+        ▼ {{ change }} ({{ pct }}%)
+      {% endif %}
+      <span style="color:var(--muted);font-size:0.85rem;font-weight:300">vs prev close ${{ prev }}</span>
+    </div>
+  </div>
+
+  <!-- STAT STRIP -->
+  <div class="stat-strip">
+    <div class="stat-cell">
+      <div class="stat-cell-label">Prev Close</div>
+      <div class="stat-cell-value">${{ prev }}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">30d High</div>
+      <div class="stat-cell-value" style="color:var(--green)">${{ high_1m }}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">30d Low</div>
+      <div class="stat-cell-value" style="color:var(--red)">${{ low_1m }}</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-cell-label">Bullish Days</div>
+      <div class="stat-cell-value">{{ bullish_count }}<span style="font-size:0.8rem;color:var(--muted)">/{{ total_days }}</span></div>
+    </div>
+  </div>
+
+  <!-- ANALYSIS HIGHLIGHT -->
+  <div class="analysis-highlight">
+    <div class="highlight-card accent">
+      <div class="highlight-label">A) Avg Open − Low<br>(bullish days only, Open &lt; Close)</div>
+      <div class="highlight-value">${{ avg_open_minus_low }}</div>
+      <div class="highlight-sub">average over {{ bullish_count }} bullish day{{ 's' if bullish_count != 1 else '' }} in last 30 days</div>
+    </div>
+    <div class="highlight-card">
+      <div class="highlight-label">What this means</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--text);line-height:1.7;margin-top:4px">
+        On days SPUS closes <span style="color:var(--green)">above its open</span>, the price dips on average
+        <span style="color:var(--purple)">${{ avg_open_minus_low }}</span> below the open before recovering.
+        This is the average intraday pullback from open on bullish sessions.
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">// 30-day close history</div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--purple)"></span>Close</span>
+        <span><span class="dot" style="background:rgba(0,229,160,0.7)"></span>High</span>
+        <span><span class="dot" style="background:rgba(255,59,92,0.7)"></span>Low</span>
+      </div>
+    </div>
+    <div class="panel-body">
+      <canvas id="chart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-title">// Daily OHLC + analysis — most recent first</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.08em">
+        Grayed rows = bearish (Open ≥ Close), excluded from analysis
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Open</th>
+            <th>High</th>
+            <th>Low</th>
+            <th>Close</th>
+            <th>Day</th>
+            <th>A) Open − Low</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in analysis_rows %}
+          <tr class="{{ '' if row.bullish else 'bearish' }}">
+            <td>{{ row.date }}</td>
+            <td>${{ row.open }}</td>
+            <td class="td-high">${{ row.high }}</td>
+            <td class="td-low">${{ row.low }}</td>
+            <td class="{{ 'td-close-up' if row.bullish else 'td-close-down' }}">${{ row.close }}</td>
+            <td>
+              <span class="day-badge {{ 'day-bull' if row.bullish else 'day-bear' }}">
+                {{ '▲ Bull' if row.bullish else '▼ Bear' }}
+              </span>
+            </td>
+            <td>
+              {% if row.open_minus_low is not none %}
+                <span class="td-analysis">${{ row.open_minus_low }}</span>
+              {% else %}
+                <span class="td-na">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <p>Updated {{ updated }} · Data via Yahoo Finance · SPUS</p>
+    <a href="/spus" class="refresh-link">↻ Refresh</a>
+  </footer>
+
+  <script>
+    const labels = {{ chart_labels | tojson }};
+    const closes = {{ closes | tojson }};
+    const highs  = {{ highs  | tojson }};
+    const lows   = {{ lows   | tojson }};
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 260);
+    grad.addColorStop(0, 'rgba(167,139,250,0.2)');
+    grad.addColorStop(1, 'rgba(167,139,250,0)');
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Close',
+            data: closes,
+            borderColor: '#a78bfa',
+            backgroundColor: grad,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: '#a78bfa',
+            pointHoverRadius: 5,
+            tension: 0.35,
+            fill: true,
+            order: 1
+          },
+          {
+            label: 'High',
+            data: highs,
+            borderColor: 'rgba(0,229,160,0.45)',
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderDash: [4,3],
+            pointRadius: 0,
+            tension: 0.35,
+            fill: false,
+            order: 2
+          },
+          {
+            label: 'Low',
+            data: lows,
+            borderColor: 'rgba(255,59,92,0.45)',
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderDash: [4,3],
+            pointRadius: 0,
+            tension: 0.35,
+            fill: false,
+            order: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0d1420',
+            borderColor: '#1c2d47',
+            borderWidth: 1,
+            titleColor: '#4a6080',
+            bodyColor: '#d8e4f0',
+            padding: 12,
+            titleFont: { family: 'JetBrains Mono', size: 10 },
+            bodyFont:  { family: 'JetBrains Mono', size: 12 },
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(28,45,71,0.6)' },
+            ticks: { color: '#4a6080', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 10 }
+          },
+          y: {
+            grid: { color: 'rgba(28,45,71,0.6)' },
+            ticks: {
+              color: '#4a6080',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: v => '$' + v
+            }
+          }
+        }
+      }
+    });
+  </script>
+  {% endif %}
+
+</div>
+</body>
+</html>
